@@ -1,4 +1,4 @@
-# PadSeq - Headless sequencer for MIDI pad controllers
+# PadSeq - Headless MIDI sequencer for pad controllers
 
 PadSeq allows you to use MIDI pad controller as a headless sequencer that
 controls other MIDI devices like synthesizers or drum samplers.
