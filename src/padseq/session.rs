@@ -1,7 +1,9 @@
 pub type Step = u8;
+pub type Channel = u8;
 pub type Note = u8;
 pub type Velocity = u8;
-pub type Bar = [Velocity; 8];
+pub const BAR_SIZE: Step = 32;
+pub type Bar = [Velocity; BAR_SIZE as usize];
 
 pub struct Session {
     bar: Bar,
@@ -10,7 +12,7 @@ pub struct Session {
 impl Session {
     pub fn new() -> Session {
         Session {
-            bar: [0, 0, 0, 0, 0, 0, 0, 0],
+            bar: [0; BAR_SIZE as usize],
         }
     }
 

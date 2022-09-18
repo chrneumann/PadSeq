@@ -6,7 +6,7 @@ use std::sync::mpsc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use super::session::{Note, Velocity};
+use super::session::{Channel, Note, Velocity};
 use midir::{Ignore, MidiIO, MidiInput, MidiInputConnection, MidiOutput, MidiOutputConnection};
 
 pub struct MidiEvent {
@@ -21,15 +21,16 @@ pub enum MidiMessageType {
 
 pub struct MidiMessage {
     pub r#type: MidiMessageType,
-    pub note: u8,
-    pub velocity: u8,
+    pub channel: Channel,
+    pub note: Note,
+    pub velocity: Velocity,
 }
 
 impl MidiMessage {
     pub fn to_array(&self) -> [u8; 3] {
         let the_type = match self.r#type {
-            MidiMessageType::NoteOff => 0x80,
-            MidiMessageType::NoteOn => 0x90,
+            MidiMessageType::NoteOff => 0x80 + self.channel - 1,
+            MidiMessageType::NoteOn => 0x90 + self.channel - 1,
         };
         return [the_type, self.note, self.velocity];
     }
@@ -40,6 +41,7 @@ impl MidiMessage {
                 0 => MidiMessageType::NoteOff,
                 _ => MidiMessageType::NoteOn,
             },
+            channel: 1, // TODO
             note: message[1],
             velocity: message[2],
         };
@@ -94,13 +96,14 @@ impl Instrument {
         }
     }
 
-    pub fn play_note(&mut self, note: Note, velocity: Velocity, duration: u64) {
+    pub fn play_note(&mut self, channel: Channel, note: Note, velocity: Velocity, duration: u64) {
         {
             println!("play on note {} {} {}", note, velocity, duration);
             let message = MidiMessage {
                 r#type: MidiMessageType::NoteOn,
                 note: note,
                 velocity: velocity,
+                channel: channel,
             };
             self.push_event(MidiEvent {
                 message: message,
@@ -113,6 +116,7 @@ impl Instrument {
                 r#type: MidiMessageType::NoteOff,
                 note: note,
                 velocity: 0,
+                channel: channel,
             };
             self.push_event(MidiEvent {
                 message: message,
@@ -121,12 +125,13 @@ impl Instrument {
         }
     }
 
-    pub fn stop_note(&mut self, note: Note) {
+    pub fn stop_note(&mut self, channel: Channel, note: Note) {
         println!("stop note {}", note);
         let message = MidiMessage {
             r#type: MidiMessageType::NoteOff,
             note: note,
             velocity: 0,
+            channel: channel,
         };
         self.push_event(MidiEvent {
             message: message,
