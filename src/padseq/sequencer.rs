@@ -1,5 +1,6 @@
 use super::midi::{Instrument, MidiMessageType};
-use super::session::{Note, Session, Step, BAR_SIZE};
+use super::session::{Note, Session, Step, StepNotes, BAR_SIZE};
+use std::collections::HashSet;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -23,7 +24,7 @@ pub struct Sequencer {
     session: Session,
     pad: Instrument,
     instrument: Instrument,
-    selected_note: Note,
+    selected_notes: HashSet<Note>,
     active: Step,
 }
 
@@ -34,7 +35,7 @@ impl Sequencer {
             pad: Instrument::new("Pad"),
             instrument: Instrument::new("Instrument"),
             active: 0,
-            selected_note: 0,
+            selected_notes: HashSet::new(),
             // instruments: Vec<Instrument>::new(),
         }
     }
@@ -58,34 +59,48 @@ impl Sequencer {
                     MidiMessageType::NoteOn => {
                         self.instrument.play_note(1, keyNote, 127, 0);
                         self.pad.play_note(1, note, PAD_COLOR_KEY_ACTIVE, 0);
+                        self.selected_notes.insert(keyNote);
                     }
                     MidiMessageType::NoteOff => {
                         self.instrument.stop_note(1, keyNote);
                         self.pad.play_note(1, note, PAD_COLOR_KEY, 0);
+                        self.selected_notes.remove(&keyNote);
                     }
                 }
-                self.selected_note = keyNote;
             } else if PAD_BAR_NOTES.contains(&note) {
                 if message.velocity > 0 {
                     let step = PAD_BAR_NOTES.iter().position(|&x| x == note).unwrap() as Step;
-                    let _note = if self.session.get_step(step) > 0 {
-                        0
+                    if self.selected_notes.len() == 0 {
+                        self.session.clear_step(step);
                     } else {
-                        self.selected_note
-                    };
-                    println!("set note {} {}", note, _note);
-                    self.session.set_step(step, _note);
+                        let mut step_notes = if self.session.has_step_set(step) {
+                            self.session.get_step(step).clone()
+                        } else {
+                            StepNotes::new()
+                        };
+                        for note in &self.selected_notes {
+                            if step_notes.contains_key(note) {
+                                step_notes.remove(note);
+                            } else {
+                                step_notes.insert(*note, 127);
+                            }
+                        }
+                        self.session.set_step(step, &step_notes);
+                    }
+                    // println!("set note {} {}", note, _note);
+                    // self.session.set_step(step, _note);
                 }
             }
         }
     }
 
     fn play_notes(&mut self) {
-        let note = self.session.get_step(self.active);
-        if note > 0 {
-            println!("play {}", note);
-            self.instrument.stop_note(1, note);
-            self.instrument.play_note(1, note, 127, 150);
+        if self.session.has_step_set(self.active) {
+            let notes = self.session.get_step(self.active);
+            for (note, velocity) in notes {
+                println!("play {}", note);
+                self.instrument.play_note(1, *note, *velocity, 0);
+            }
         }
     }
 
@@ -97,14 +112,14 @@ impl Sequencer {
             1
         };
         if step == self.active {
-            if self.session.get_step(step) > 0 {
+            if self.session.has_step_set(step) {
                 self.pad
                     .play_note(channel, note, PAD_COLOR_STEP_SET_AND_ACTIVE, 0);
             } else {
                 self.pad.play_note(channel, note, PAD_COLOR_STEP_ACTIVE, 0);
             }
         } else {
-            if self.session.get_step(step) > 0 {
+            if self.session.has_step_set(step) {
                 self.pad.play_note(channel, note, PAD_COLOR_STEP_SET, 0);
             } else {
                 self.pad.play_note(channel, note, PAD_COLOR_STEP_OFF, 0);
