@@ -16,6 +16,9 @@ const PAD_COLOR_KEY: u8 = 12;
 const PAD_COLOR_KEY_ACTIVE: u8 = 9;
 const BASE_C_NOTE: Note = 60;
 
+type StepSize = f64;
+const BASE_BPM: StepSize = 126.0;
+
 pub struct Sequencer {
     session: Session,
     pad: Instrument,
@@ -116,15 +119,15 @@ impl Sequencer {
     }
 
     pub fn run(&mut self) {
-        let mut step = 0;
+        let mut step = 0.0;
         for n in 0..12 {
             let note = PAD_KEY_NOTES[n];
             self.pad.play_note(1, note, PAD_COLOR_KEY, 0);
         }
         loop {
-            if step >= (150) {
+            if step >= 1000.0 * 60.0 / (4.0 * BASE_BPM) {
                 self.active = (self.active + 1) % BAR_SIZE;
-                step = 0;
+                step = 0.0;
                 self.play_notes();
                 self.refresh();
             }
@@ -132,7 +135,7 @@ impl Sequencer {
             self.handle_pad_events();
             self.pad.send_events();
             sleep(Duration::from_millis(10));
-            step += 10;
+            step += 10.0;
         }
     }
 }
