@@ -1,5 +1,6 @@
 use super::midi::{Instrument, MidiMessageType};
 use super::session::{Note, Session, Step, StepNotes, BAR_SIZE};
+use std::cmp;
 use std::collections::HashSet;
 use std::thread::sleep;
 use std::time::Duration;
@@ -11,7 +12,7 @@ const PAD_BAR_NOTES: [Note; BAR_SIZE as usize] = [
 const PAD_KEY_NOTES: [Note; 12] = [22, 32, 23, 33, 24, 25, 35, 26, 36, 27, 37, 28];
 const PAD_COLOR_STEP_OFF: u8 = 112;
 const PAD_COLOR_STEP_SET: u8 = 53;
-const PAD_COLOR_STEP_SET_OTHER_NOTE: u8 = 45;
+const PAD_COLOR_STEP_SET_OTHER_NOTE: [u8; 4] = [19, 22, 17, 16];
 const PAD_COLOR_STEP_SET_AND_ACTIVE: u8 = 78;
 const PAD_COLOR_STEP_ACTIVE: u8 = 3;
 const PAD_COLOR_KEY: u8 = 12;
@@ -103,6 +104,8 @@ impl Sequencer {
             for (note, velocity) in notes {
                 println!("play {}", note);
                 self.instrument.play_note(1, *note, *velocity, 0);
+                let key_note = PAD_KEY_NOTES[(note - BASE_C_NOTE) as usize];
+                self.pad.play_note(1, key_note, PAD_COLOR_KEY_ACTIVE, 0);
             }
         }
     }
@@ -133,8 +136,13 @@ impl Sequencer {
                 if !any_missing {
                     self.pad.play_note(channel, note, PAD_COLOR_STEP_SET, 0);
                 } else {
-                    self.pad
-                        .play_note(channel, note, PAD_COLOR_STEP_SET_OTHER_NOTE, 0);
+                    self.pad.play_note(
+                        channel,
+                        note,
+                        PAD_COLOR_STEP_SET_OTHER_NOTE
+                            [cmp::min(cmp::max(self.session.get_step(step).len(), 0) - 1, 3)],
+                        0,
+                    );
                 }
             } else {
                 self.pad.play_note(channel, note, PAD_COLOR_STEP_OFF, 0);
@@ -151,12 +159,13 @@ impl Sequencer {
     pub fn run(&mut self) {
         self.instrument.set_debug(true);
         let mut step = 0.0;
-        for n in 0..12 {
-            let note = PAD_KEY_NOTES[n];
-            self.pad.play_note(1, note, PAD_COLOR_KEY, 0);
-        }
         loop {
             if step >= 1000.0 * 60.0 / (4.0 * BASE_BPM) {
+                for n in 0..12 {
+                    let note = PAD_KEY_NOTES[n];
+                    self.pad.play_note(1, note, PAD_COLOR_KEY, 0);
+                }
+
                 self.active = (self.active + 1) % BAR_SIZE;
                 step = 0.0;
                 self.play_notes();
@@ -165,8 +174,8 @@ impl Sequencer {
             self.instrument.send_events();
             self.handle_pad_events();
             self.pad.send_events();
-            sleep(Duration::from_millis(10));
-            step += 10.0;
+            sleep(Duration::from_millis(1));
+            step += 1.0;
         }
     }
 }
