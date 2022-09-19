@@ -10,7 +10,8 @@ const PAD_BAR_NOTES: [Note; BAR_SIZE as usize] = [
 ];
 const PAD_KEY_NOTES: [Note; 12] = [22, 32, 23, 33, 24, 25, 35, 26, 36, 27, 37, 28];
 const PAD_COLOR_STEP_OFF: u8 = 112;
-const PAD_COLOR_STEP_SET: u8 = 45;
+const PAD_COLOR_STEP_SET: u8 = 53;
+const PAD_COLOR_STEP_SET_OTHER_NOTE: u8 = 45;
 const PAD_COLOR_STEP_SET_AND_ACTIVE: u8 = 78;
 const PAD_COLOR_STEP_ACTIVE: u8 = 3;
 const PAD_COLOR_KEY: u8 = 12;
@@ -20,11 +21,13 @@ const BASE_C_NOTE: Note = 60;
 type StepSize = f64;
 const BASE_BPM: StepSize = 126.0;
 
+type SelectedNotes = HashSet<Note>;
+
 pub struct Sequencer {
     session: Session,
     pad: Instrument,
     instrument: Instrument,
-    selected_notes: HashSet<Note>,
+    selected_notes: SelectedNotes,
     active: Step,
 }
 
@@ -35,7 +38,7 @@ impl Sequencer {
             pad: Instrument::new("Pad"),
             instrument: Instrument::new("Instrument"),
             active: 0,
-            selected_notes: HashSet::new(),
+            selected_notes: SelectedNotes::new(),
             // instruments: Vec<Instrument>::new(),
         }
     }
@@ -120,7 +123,19 @@ impl Sequencer {
             }
         } else {
             if self.session.has_step_set(step) {
-                self.pad.play_note(channel, note, PAD_COLOR_STEP_SET, 0);
+                let mut any_missing = self.selected_notes.len() == 0;
+                for note in self.selected_notes.clone() {
+                    if !self.session.get_step(step).contains_key(&note) {
+                        any_missing = true;
+                        break;
+                    }
+                }
+                if !any_missing {
+                    self.pad.play_note(channel, note, PAD_COLOR_STEP_SET, 0);
+                } else {
+                    self.pad
+                        .play_note(channel, note, PAD_COLOR_STEP_SET_OTHER_NOTE, 0);
+                }
             } else {
                 self.pad.play_note(channel, note, PAD_COLOR_STEP_OFF, 0);
             }
