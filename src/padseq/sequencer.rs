@@ -119,6 +119,7 @@ impl Sequencer {
     }
 
     pub fn run(&mut self) {
+        self.instrument.set_debug(true);
         let mut step = 0.0;
         for n in 0..12 {
             let note = PAD_KEY_NOTES[n];

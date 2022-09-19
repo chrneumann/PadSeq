@@ -58,6 +58,7 @@ pub struct Instrument {
     events_out: MidiEventQueue,
     chan_out: mpsc::Sender<MidiEvent>,
     chan_in: mpsc::Receiver<MidiEvent>,
+    debug: bool,
 }
 
 impl Instrument {
@@ -71,7 +72,12 @@ impl Instrument {
             chan_in: rx,
             chan_out: tx,
             name: name,
+            debug: false,
         }
+    }
+
+    pub fn set_debug(&mut self, v: bool) {
+        self.debug = v;
     }
 
     pub fn send_events(&mut self) {
@@ -82,7 +88,9 @@ impl Instrument {
                     if x.instant == None || Instant::now() > x.instant.unwrap() {
                         match &mut self.midi_out {
                             Some(out) => {
-                                println!("send {:?}", &x.message.to_array());
+                                if self.debug {
+                                    println!("send {:?}", &x.message.to_array());
+                                }
                                 let _ = out.send(&x.message.to_array());
                             }
                             None => {}
@@ -98,7 +106,9 @@ impl Instrument {
 
     pub fn play_note(&mut self, channel: Channel, note: Note, velocity: Velocity, duration: u64) {
         {
-            println!("play on note {} {} {}", note, velocity, duration);
+            if self.debug {
+                println!("play on note {} {} {}", note, velocity, duration);
+            }
             let message = MidiMessage {
                 r#type: MidiMessageType::NoteOn,
                 note: note,
@@ -111,7 +121,9 @@ impl Instrument {
             });
         }
         if duration > 0 {
-            println!("also play stop note>");
+            if self.debug {
+                println!("also play stop note>");
+            }
             let message = MidiMessage {
                 r#type: MidiMessageType::NoteOff,
                 note: note,
@@ -126,7 +138,9 @@ impl Instrument {
     }
 
     pub fn stop_note(&mut self, channel: Channel, note: Note) {
-        println!("stop note {}", note);
+        if self.debug {
+            println!("stop note {}", note);
+        }
         let message = MidiMessage {
             r#type: MidiMessageType::NoteOff,
             note: note,
@@ -190,7 +204,7 @@ impl Instrument {
                     "midir-forward",
                     |stamp, message, chan_out| {
                         // conn_out.send(message).unwrap_or_else(|_| println!("Error when forwarding message ..."));
-                        println!("{}: {:?} (len = {})", stamp, message, message.len());
+                        // println!("{}: {:?} (len = {})", stamp, message, message.len());
                         // let value : usize = message[1] as usize;
                         chan_out.send(MidiEvent {
                             message: MidiMessage::from_array(message),
