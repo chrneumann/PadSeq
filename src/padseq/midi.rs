@@ -90,7 +90,7 @@ impl Instrument {
     fn enqueue_stop_notes(&mut self) {
         for (note, instant) in &self.stop_notes.clone() {
             if Instant::now() > *instant {
-                self.play_note(0, *note, 0, 0.0);
+                self.play_note(1, *note, 0, 0.0);
                 self.stop_notes.remove(&note);
             }
         }
