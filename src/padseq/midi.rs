@@ -1,6 +1,6 @@
 extern crate midir;
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc;
 
 use std::thread::sleep;
@@ -64,6 +64,7 @@ pub struct Instrument {
     chan_out: mpsc::Sender<MidiEvent>,
     chan_in: mpsc::Receiver<MidiEvent>,
     debug: bool,
+    stop_notes: HashMap<Note, Instant>,
 }
 
 impl Instrument {
@@ -78,6 +79,7 @@ impl Instrument {
             chan_out: tx,
             name: name.to_string(),
             debug: false,
+            stop_notes: HashMap::new(),
         }
     }
 
@@ -85,7 +87,17 @@ impl Instrument {
         self.debug = v;
     }
 
+    fn enqueue_stop_notes(&mut self) {
+        for (note, instant) in &self.stop_notes.clone() {
+            if Instant::now() > *instant {
+                self.play_note(0, *note, 0, 0.0);
+                self.stop_notes.remove(&note);
+            }
+        }
+    }
+
     pub fn send_events(&mut self) {
+        self.enqueue_stop_notes();
         for _ in 0..self.events_out.len() {
             let message = self.events_out.pop_front();
             match message {
@@ -109,36 +121,34 @@ impl Instrument {
         }
     }
 
-    pub fn play_note(&mut self, channel: Channel, note: Note, velocity: Velocity, duration: u64) {
+    pub fn play_note(&mut self, channel: Channel, note: Note, velocity: Velocity, duration: f64) {
         {
-            if self.debug {
-                println!("play on note {} {} {}", note, velocity, duration);
+            if duration == 0.0 || !self.stop_notes.contains_key(&note) {
+                if self.debug {
+                    println!("play on note {} {} {}", note, velocity, duration);
+                }
+                let message = MidiMessage {
+                    r#type: MidiMessageType::NoteOn,
+                    note: note,
+                    velocity: velocity,
+                    channel: channel,
+                };
+                self.push_event(MidiEvent {
+                    message: message,
+                    instant: None,
+                });
             }
-            let message = MidiMessage {
-                r#type: MidiMessageType::NoteOn,
-                note: note,
-                velocity: velocity,
-                channel: channel,
-            };
-            self.push_event(MidiEvent {
-                message: message,
-                instant: None,
-            });
         }
-        if duration > 0 {
+        if duration > 0.0 {
             if self.debug {
-                println!("also play stop note>");
+                println!("also play stop note");
             }
-            let message = MidiMessage {
-                r#type: MidiMessageType::NoteOff,
-                note: note,
-                velocity: 0,
-                channel: channel,
-            };
-            self.push_event(MidiEvent {
-                message: message,
-                instant: Instant::now().checked_add(Duration::from_millis(duration)),
-            });
+            self.stop_notes.insert(
+                note,
+                Instant::now()
+                    .checked_add(Duration::from_secs_f64(duration / 1000.0))
+                    .unwrap(),
+            );
         }
     }
 

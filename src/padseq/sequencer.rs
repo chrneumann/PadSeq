@@ -3,7 +3,7 @@ use super::session::{Note, Session, Step, StepNotes, BAR_SIZE};
 use std::cmp;
 use std::collections::HashSet;
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const NUMBER_OF_INSTRUMENTS: usize = 8;
 const PAD_BAR_NOTES: [Note; BAR_SIZE as usize] = [
@@ -24,6 +24,7 @@ const BASE_C_NOTE: Note = 60;
 
 type StepSize = f64;
 const BASE_BPM: StepSize = 126.0;
+const STEP_LENGTH: StepSize = 1000.0 * 60.0 / (4.0 * BASE_BPM);
 
 type SelectedNotes = HashSet<Note>;
 
@@ -93,9 +94,9 @@ impl Sequencer {
                                     1,
                                     keyNote,
                                     message.velocity,
-                                    0,
+                                    0.0,
                                 );
-                                self.pad.play_note(1, note, PAD_COLOR_KEY_ACTIVE, 0);
+                                self.pad.play_note(1, note, PAD_COLOR_KEY_ACTIVE, 0.0);
                                 match message.velocity {
                                     0 => {
                                         self.selected_notes.remove(&keyNote);
@@ -107,7 +108,7 @@ impl Sequencer {
                             }
                             MidiMessageType::NoteOff => {
                                 self.instruments[self.active_instrument].stop_note(1, keyNote);
-                                self.pad.play_note(1, note, PAD_COLOR_KEY, 0);
+                                self.pad.play_note(1, note, PAD_COLOR_KEY, 0.0);
                                 self.selected_notes.remove(&keyNote);
                             }
                             _ => {
@@ -174,10 +175,10 @@ impl Sequencer {
                     .get_step(self.active_step);
                 for (note, velocity) in notes {
                     println!("play {}", note);
-                    self.instruments[instrument].play_note(1, *note, *velocity, 0);
+                    self.instruments[instrument].play_note(1, *note, *velocity, STEP_LENGTH); // TODO
                     if instrument == self.active_instrument {
                         let key_note = PAD_KEY_NOTES[(note - BASE_C_NOTE) as usize];
-                        self.pad.play_note(1, key_note, PAD_COLOR_KEY_ACTIVE, 0);
+                        self.pad.play_note(1, key_note, PAD_COLOR_KEY_ACTIVE, 0.0);
                     }
                 }
             }
@@ -199,9 +200,10 @@ impl Sequencer {
                 .has_step_set(step)
             {
                 self.pad
-                    .play_note(channel, note, PAD_COLOR_STEP_SET_AND_ACTIVE, 0);
+                    .play_note(channel, note, PAD_COLOR_STEP_SET_AND_ACTIVE, 0.0);
             } else {
-                self.pad.play_note(channel, note, PAD_COLOR_STEP_ACTIVE, 0);
+                self.pad
+                    .play_note(channel, note, PAD_COLOR_STEP_ACTIVE, 0.0);
             }
         } else {
             if self
@@ -224,7 +226,7 @@ impl Sequencer {
                     }
                 }
                 if !any_missing {
-                    self.pad.play_note(channel, note, PAD_COLOR_STEP_SET, 0);
+                    self.pad.play_note(channel, note, PAD_COLOR_STEP_SET, 0.0);
                 } else {
                     self.pad.play_note(
                         channel,
@@ -240,11 +242,11 @@ impl Sequencer {
                             ) - 1,
                             3,
                         )],
-                        0,
+                        0.0,
                     );
                 }
             } else {
-                self.pad.play_note(channel, note, PAD_COLOR_STEP_OFF, 0);
+                self.pad.play_note(channel, note, PAD_COLOR_STEP_OFF, 0.0);
             }
         }
     }
@@ -259,16 +261,16 @@ impl Sequencer {
         for n in 0..NUMBER_OF_INSTRUMENTS {
             self.instruments[n].set_debug(true);
         }
-        let mut step = 0.0;
+        let mut last_step = Instant::now();
         loop {
-            if step >= 1000.0 * 60.0 / (4.0 * BASE_BPM) {
+            if last_step.elapsed().as_micros() >= (STEP_LENGTH * 1000.0).floor() as u128 {
+                last_step = Instant::now();
                 for n in 0..12 {
                     let note = PAD_KEY_NOTES[n];
-                    self.pad.play_note(1, note, PAD_COLOR_KEY, 0);
+                    self.pad.play_note(1, note, PAD_COLOR_KEY, 0.0);
                 }
 
                 self.active_step = (self.active_step + 1) % BAR_SIZE;
-                step = 0.0;
                 self.play_notes();
                 self.refresh();
             }
@@ -277,8 +279,7 @@ impl Sequencer {
             }
             self.handle_pad_events();
             self.pad.send_events();
-            sleep(Duration::from_millis(1));
-            step += 1.0;
+            sleep(Duration::from_micros(1));
         }
     }
 }
