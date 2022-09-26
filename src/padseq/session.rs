@@ -8,13 +8,13 @@ pub const BAR_SIZE: Step = 32;
 pub type StepNotes = HashMap<Note, Velocity>;
 pub type Bar = HashMap<Step, StepNotes>;
 
-pub struct Session {
+pub struct Pattern {
     bar: Bar,
 }
 
-impl Session {
-    pub fn new() -> Session {
-        Session { bar: Bar::new() }
+impl Pattern {
+    pub fn new() -> Pattern {
+        Pattern { bar: Bar::new() }
     }
 
     pub fn set_step(&mut self, step: Step, notes: &StepNotes) {
@@ -32,5 +32,41 @@ impl Session {
 
     pub fn has_step_set(&self, step: Step) -> bool {
         return self.bar.contains_key(&step);
+    }
+}
+
+pub struct Instrument {
+    patterns: Vec<Pattern>,
+}
+
+impl Instrument {
+    pub fn new() -> Instrument {
+        let mut patterns = Vec::new();
+        patterns.push(Pattern::new());
+        Instrument { patterns: patterns }
+    }
+
+    pub fn get_pattern(&mut self, index: usize) -> &mut Pattern {
+        &mut self.patterns[index]
+    }
+}
+
+pub struct Session {
+    instruments: Vec<Instrument>,
+}
+
+impl Session {
+    pub fn new(number_of_instruments: usize) -> Session {
+        let mut instruments = Vec::new();
+        for _ in 0..number_of_instruments {
+            instruments.push(Instrument::new());
+        }
+        return Session {
+            instruments: instruments,
+        };
+    }
+
+    pub fn get_instrument(&mut self, index: usize) -> &mut Instrument {
+        &mut self.instruments[index]
     }
 }

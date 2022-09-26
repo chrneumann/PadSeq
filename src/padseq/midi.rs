@@ -17,6 +17,7 @@ pub struct MidiEvent {
 pub enum MidiMessageType {
     NoteOff,
     NoteOn,
+    ControlChange,
 }
 
 pub struct MidiMessage {
@@ -31,15 +32,19 @@ impl MidiMessage {
         let the_type = match self.r#type {
             MidiMessageType::NoteOff => 0x80 + self.channel - 1,
             MidiMessageType::NoteOn => 0x90 + self.channel - 1,
+            MidiMessageType::ControlChange => 0xB0 + self.channel - 1,
         };
         return [the_type, self.note, self.velocity];
     }
 
     pub fn from_array(message: &[u8]) -> MidiMessage {
+        println!("received {:?}", message);
         return MidiMessage {
-            r#type: match message[2] {
-                0 => MidiMessageType::NoteOff,
-                _ => MidiMessageType::NoteOn,
+            r#type: match message[0] {
+                0x80..=0x8F => MidiMessageType::NoteOff,
+                0x90..=0x9F => MidiMessageType::NoteOn,
+                0xb0..=0xbf => MidiMessageType::ControlChange,
+                _ => panic!("Unknown MIDI message {:?}", message), // TODO
             },
             channel: 1, // TODO
             note: message[1],
@@ -51,7 +56,7 @@ impl MidiMessage {
 type MidiEventQueue = VecDeque<MidiEvent>;
 
 pub struct Instrument {
-    name: &'static str,
+    name: String,
     midi_out: Option<MidiOutputConnection>,
     midi_in: Option<MidiInputConnection<mpsc::Sender<MidiEvent>>>,
     events_in: MidiEventQueue,
@@ -62,7 +67,7 @@ pub struct Instrument {
 }
 
 impl Instrument {
-    pub fn new(name: &'static str) -> Instrument {
+    pub fn new(name: &str) -> Instrument {
         let (tx, rx) = mpsc::channel();
         Instrument {
             midi_out: None,
@@ -71,7 +76,7 @@ impl Instrument {
             events_out: VecDeque::new(),
             chan_in: rx,
             chan_out: tx,
-            name: name,
+            name: name.to_string(),
             debug: false,
         }
     }
@@ -181,11 +186,11 @@ impl Instrument {
     }
 
     pub fn connect_out(&mut self, port: u8) {
-        let midi_out = MidiOutput::new(self.name).unwrap();
+        let midi_out = MidiOutput::new(&self.name).unwrap();
         let out_port = self.select_port(port, &midi_out).unwrap();
         let port_name = midi_out.port_name(&out_port).unwrap();
         println!("Connection open, outgoing to '{}' ...", port_name);
-        let conn_out = midi_out.connect(&out_port, self.name).unwrap();
+        let conn_out = midi_out.connect(&out_port, &self.name).unwrap();
         self.midi_out = Some(conn_out);
     }
 
@@ -204,7 +209,7 @@ impl Instrument {
                     "midir-forward",
                     |stamp, message, chan_out| {
                         // conn_out.send(message).unwrap_or_else(|_| println!("Error when forwarding message ..."));
-                        // println!("{}: {:?} (len = {})", stamp, message, message.len());
+                        println!("{}: {:?} (len = {})", stamp, message, message.len());
                         // let value : usize = message[1] as usize;
                         chan_out.send(MidiEvent {
                             message: MidiMessage::from_array(message),
