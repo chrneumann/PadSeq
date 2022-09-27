@@ -2,6 +2,8 @@ use super::midi::{Instrument, MidiMessageType};
 use super::session::{Note, Session, Step, StepNotes, BAR_SIZE};
 use std::cmp;
 use std::collections::HashSet;
+use std::fs;
+use std::path::Path;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -35,12 +37,24 @@ pub struct Sequencer {
     selected_notes: SelectedNotes,
     active_step: Step,
     active_instrument: usize,
+    session_file_path: Option<String>,
 }
 
 impl Sequencer {
-    pub fn new() -> Sequencer {
+    pub fn new(file_path: Option<String>) -> Sequencer {
+        let session = match file_path {
+            Some(ref path) => match Path::new(path).exists() {
+                true => Session::from_json(
+                    &fs::read_to_string(path).expect("Should have been able to read the file"),
+                )
+                .unwrap(),
+                false => Session::new(NUMBER_OF_INSTRUMENTS),
+            },
+            None => Session::new(NUMBER_OF_INSTRUMENTS),
+        };
         Sequencer {
-            session: Session::new(NUMBER_OF_INSTRUMENTS),
+            session,
+            session_file_path: file_path.clone(),
             pad: Instrument::new(&"Pad".to_string()),
             instruments: Vec::new(),
             active_step: 0,
@@ -151,8 +165,7 @@ impl Sequencer {
                                     .get_pattern(0)
                                     .set_step(step, &step_notes);
                             }
-                            // println!("set note {} {}", note, _note);
-                            // self.session.set_step(step, _note);
+                            self.save_session();
                         }
                     }
                 }
@@ -255,6 +268,17 @@ impl Sequencer {
         for n in 0..BAR_SIZE {
             self.refresh_step(n);
         }
+    }
+
+    pub fn save_session(&self) {
+        match &self.session_file_path {
+            Some(path) => {
+                let data = self.session.to_json().unwrap();
+                println!("{} {}", path, data);
+                fs::write(path, data).expect("Unable to write file");
+            }
+            None => {}
+        };
     }
 
     pub fn run(&mut self) {
