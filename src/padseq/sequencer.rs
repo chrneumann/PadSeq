@@ -86,30 +86,30 @@ impl Sequencer {
                 }
                 _ => {
                     if PAD_KEY_NOTES.contains(&note) {
-                        let keyNote = BASE_C_NOTE
+                        let key_note = BASE_C_NOTE
                             + PAD_KEY_NOTES.iter().position(|&x| x == note).unwrap() as Note;
                         match message.r#type {
                             MidiMessageType::NoteOn => {
                                 self.instruments[self.active_instrument].play_note(
                                     1,
-                                    keyNote,
+                                    key_note,
                                     message.velocity,
                                     0.0,
                                 );
                                 self.pad.play_note(1, note, PAD_COLOR_KEY_ACTIVE, 0.0);
                                 match message.velocity {
                                     0 => {
-                                        self.selected_notes.remove(&keyNote);
+                                        self.selected_notes.remove(&key_note);
                                     }
                                     _ => {
-                                        self.selected_notes.insert(keyNote);
+                                        self.selected_notes.insert(key_note);
                                     }
                                 }
                             }
                             MidiMessageType::NoteOff => {
-                                self.instruments[self.active_instrument].stop_note(1, keyNote);
+                                self.instruments[self.active_instrument].stop_note(1, key_note);
                                 self.pad.play_note(1, note, PAD_COLOR_KEY, 0.0);
-                                self.selected_notes.remove(&keyNote);
+                                self.selected_notes.remove(&key_note);
                             }
                             _ => {
                                 panic!()

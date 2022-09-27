@@ -3,7 +3,6 @@ extern crate midir;
 use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc;
 
-use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 use super::session::{Channel, Note, Velocity};
@@ -221,10 +220,12 @@ impl Instrument {
                         // conn_out.send(message).unwrap_or_else(|_| println!("Error when forwarding message ..."));
                         println!("{}: {:?} (len = {})", stamp, message, message.len());
                         // let value : usize = message[1] as usize;
-                        chan_out.send(MidiEvent {
-                            message: MidiMessage::from_array(message),
-                            instant: None,
-                        });
+                        chan_out
+                            .send(MidiEvent {
+                                message: MidiMessage::from_array(message),
+                                instant: None,
+                            })
+                            .unwrap();
                     },
                     self.chan_out.clone(),
                 )
