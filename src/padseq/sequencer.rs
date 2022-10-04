@@ -251,7 +251,7 @@ impl Sequencer {
                                     .get_pattern(0)
                                     .get_step(step)
                                     .len(),
-                                0,
+                                1,
                             ) - 1,
                             3,
                         )],
