@@ -2,6 +2,7 @@ use std::env;
 use std::process;
 mod padseq;
 use padseq::sequencer::Sequencer;
+use padseq::ui::UI;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -13,8 +14,7 @@ fn main() {
             process::exit(1);
         }
     };
-    let mut seq = Sequencer::new(file_path);
-    seq.connect();
+    let mut ui = UI::new(Sequencer::new(file_path));
     print!("Connected");
-    seq.run();
+    ui.run();
 }
