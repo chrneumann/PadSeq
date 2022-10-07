@@ -8,9 +8,10 @@ pub type Note = u8;
 pub type Velocity = u8;
 pub const BAR_SIZE: Step = 32;
 pub type StepNotes = HashMap<Note, Velocity>;
+
 pub type Bar = HashMap<Step, StepNotes>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Pattern {
     bar: Bar,
 }
@@ -40,18 +41,40 @@ impl Pattern {
 
 #[derive(Serialize, Deserialize)]
 pub struct Instrument {
-    patterns: Vec<Pattern>,
+    patterns: HashMap<usize, Pattern>,
+    active_pattern: Option<usize>,
 }
 
 impl Instrument {
     pub fn new() -> Instrument {
-        let mut patterns = Vec::new();
-        patterns.push(Pattern::new());
-        Instrument { patterns: patterns }
+        Instrument {
+            patterns: HashMap::new(),
+            active_pattern: None,
+        }
     }
 
-    pub fn get_pattern(&mut self, index: usize) -> &mut Pattern {
-        &mut self.patterns[index]
+    pub fn has_pattern(&self, index: usize) -> bool {
+        return self.patterns.contains_key(&index);
+    }
+
+    pub fn get_pattern(&self, index: usize) -> Option<&Pattern> {
+        return self.patterns.get(&index);
+    }
+
+    pub fn get_pattern_mut(&mut self, index: usize) -> Option<&mut Pattern> {
+        return self.patterns.get_mut(&index);
+    }
+
+    pub fn set_pattern(&mut self, index: usize, pattern: &Pattern) {
+        self.patterns.insert(index, pattern.clone());
+    }
+
+    pub fn get_active_pattern(&self) -> Option<usize> {
+        return self.active_pattern;
+    }
+
+    pub fn set_active_pattern(&mut self, pattern: Option<usize>) {
+        self.active_pattern = pattern;
     }
 }
 
@@ -76,7 +99,11 @@ impl Session {
         Ok(s)
     }
 
-    pub fn get_instrument(&mut self, index: usize) -> &mut Instrument {
+    pub fn get_instrument(&self, index: usize) -> &Instrument {
+        &self.instruments[index]
+    }
+
+    pub fn get_instrument_mut(&mut self, index: usize) -> &mut Instrument {
         &mut self.instruments[index]
     }
 

@@ -2,7 +2,7 @@ use super::midi::Instrument;
 use super::session::{Note, Session, Step, BAR_SIZE};
 use std::fs;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub const NUMBER_OF_INSTRUMENTS: usize = 8;
 
@@ -60,22 +60,35 @@ impl Sequencer {
     fn play_notes(&mut self) -> PlayedNotes {
         let mut played_notes = PlayedNotes::new();
         for instrument in 0..NUMBER_OF_INSTRUMENTS {
-            if self
-                .session
-                .get_instrument(instrument)
-                .get_pattern(0)
-                .has_step_set(self.active_step)
-            {
-                let notes = self
-                    .session
-                    .get_instrument(instrument)
-                    .get_pattern(0)
-                    .get_step(self.active_step);
-                for (note, velocity) in notes {
-                    println!("play {}", note);
-                    self.instruments[instrument].play_note(1, *note, *velocity, STEP_LENGTH); // TODO
-                    played_notes.push((instrument, *note));
+            match self.session.get_instrument(instrument).get_active_pattern() {
+                Some(pattern) => {
+                    if self.session.get_instrument(instrument).has_pattern(pattern)
+                        && self
+                            .session
+                            .get_instrument(instrument)
+                            .get_pattern(pattern)
+                            .unwrap()
+                            .has_step_set(self.active_step)
+                    {
+                        let notes = self
+                            .session
+                            .get_instrument(instrument)
+                            .get_pattern(pattern)
+                            .unwrap()
+                            .get_step(self.active_step);
+                        for (note, velocity) in notes {
+                            println!("play {}", note);
+                            self.instruments[instrument].play_note(
+                                1,
+                                *note,
+                                *velocity,
+                                STEP_LENGTH,
+                            ); // TODO
+                            played_notes.push((instrument, *note));
+                        }
+                    }
                 }
+                None => {}
             }
         }
         return played_notes;
@@ -92,7 +105,11 @@ impl Sequencer {
         };
     }
 
-    pub fn get_session(&mut self) -> &mut Session {
+    pub fn get_session(&self) -> &Session {
+        return &self.session;
+    }
+
+    pub fn get_session_mut(&mut self) -> &mut Session {
         return &mut self.session;
     }
 

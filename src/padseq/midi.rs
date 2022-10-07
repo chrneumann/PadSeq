@@ -151,6 +151,19 @@ impl Instrument {
         }
     }
 
+    pub fn send_cc(&mut self, channel: Channel, cc: Note, value: Velocity) {
+        let message = MidiMessage {
+            r#type: MidiMessageType::ControlChange,
+            note: cc,
+            velocity: value,
+            channel: channel,
+        };
+        self.push_event(MidiEvent {
+            message: message,
+            instant: None,
+        });
+    }
+
     pub fn stop_note(&mut self, channel: Channel, note: Note) {
         if self.debug {
             println!("stop note {}", note);
