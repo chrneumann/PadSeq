@@ -8,7 +8,9 @@ pub const PAD_BAR_NOTES: [Note; BAR_SIZE as usize] = [
     81, 82, 83, 84, 85, 86, 87, 88, 71, 72, 73, 74, 75, 76, 77, 78, 61, 62, 63, 64, 65, 66, 67, 68,
     51, 52, 53, 54, 55, 56, 57, 58,
 ];
-const PAD_KEY_NOTES: [Note; 12] = [22, 32, 23, 33, 24, 25, 35, 26, 36, 27, 37, 28];
+const PAD_KEY_NOTES: [Note; 13] = [21, 22, 32, 23, 33, 24, 25, 35, 26, 36, 27, 37, 28];
+const PAD_PREV_OCTAVE: u8 = 31;
+const PAD_NEXT_OCTAVE: u8 = 38;
 const PAD_SESSION_CC: u8 = 95;
 // const PAD_NEXT_CC: u8 = 94;
 // const PAD_PREV_CC: u8 = 93;
@@ -19,7 +21,8 @@ const PAD_COLOR_STEP_SET_AND_ACTIVE: u8 = 78;
 const PAD_COLOR_STEP_ACTIVE: u8 = 3;
 const PAD_COLOR_KEY: u8 = 12;
 const PAD_COLOR_KEY_ACTIVE: u8 = 9;
-const BASE_C_NOTE: Note = 60;
+const MIN_OCTAVE: u8 = 1;
+const MAX_OCTAVE: u8 = 8;
 
 type SelectedNotes = HashSet<Note>;
 
@@ -27,6 +30,7 @@ pub struct Pattern {
     instrument: usize,
     pattern: usize,
     selected_notes: SelectedNotes,
+    octave: u8,
 }
 
 impl Pattern {
@@ -35,6 +39,7 @@ impl Pattern {
             selected_notes: SelectedNotes::new(),
             pattern: pattern,
             instrument: instrument,
+            octave: 5,
         }
     }
 
@@ -123,9 +128,24 @@ impl Pattern {
 impl Screen for Pattern {
     fn prepare_step(&mut self, context: &mut UIContext) {
         // clear highlighted notes
-        for n in 0..12 {
-            let note = PAD_KEY_NOTES[n];
-            context.pad.play_note(1, note, PAD_COLOR_KEY, 0.0);
+        for note in PAD_KEY_NOTES {
+            let color = if note == PAD_KEY_NOTES[1] && self.octave == 5 {
+                13
+            } else {
+                PAD_COLOR_KEY
+            };
+            context.pad.play_note(1, note, color, 0.0);
+        }
+
+        if (self.octave < MAX_OCTAVE) {
+            context.pad.send_cc(1, PAD_NEXT_OCTAVE, 55);
+        } else {
+            context.pad.send_cc(1, PAD_NEXT_OCTAVE, 0);
+        }
+        if (self.octave > MIN_OCTAVE) {
+            context.pad.send_cc(1, PAD_PREV_OCTAVE, 55);
+        } else {
+            context.pad.send_cc(1, PAD_PREV_OCTAVE, 0);
         }
     }
 
@@ -155,7 +175,7 @@ impl Screen for Pattern {
                 }
                 _ => {
                     if PAD_KEY_NOTES.contains(&note) {
-                        let key_note = BASE_C_NOTE
+                        let key_note = self.octave * 12 - 1
                             + PAD_KEY_NOTES.iter().position(|&x| x == note).unwrap() as Note;
                         match message.r#type {
                             MidiMessageType::NoteOn => {
@@ -236,6 +256,16 @@ impl Screen for Pattern {
                             }
                             context.sequencer.save_session();
                         }
+                    } else if note == PAD_NEXT_OCTAVE
+                        && self.octave < MAX_OCTAVE
+                        && message.velocity > 0
+                    {
+                        self.octave = self.octave + 1;
+                    } else if note == PAD_PREV_OCTAVE
+                        && self.octave > MIN_OCTAVE
+                        && message.velocity > 0
+                    {
+                        self.octave = self.octave - 1;
                     }
                 }
             }
@@ -252,8 +282,11 @@ impl Screen for Pattern {
     }
 
     fn on_played_note(&mut self, context: &mut UIContext, instrument: usize, note: Note) {
-        if instrument == self.instrument {
-            let key_note = PAD_KEY_NOTES[(note - BASE_C_NOTE) as usize];
+        if instrument == self.instrument
+            && note >= (self.octave * 12 - 1)
+            && note < (self.octave + 1) * 12
+        {
+            let key_note = PAD_KEY_NOTES[(note - (self.octave * 12 - 1)) as usize];
             context
                 .pad
                 .play_note(1, key_note, PAD_COLOR_KEY_ACTIVE, 0.0);
@@ -267,6 +300,8 @@ impl Screen for Pattern {
         for note in PAD_BAR_NOTES {
             context.pad.play_note(1, note, 0, 0.0);
         }
+        context.pad.send_cc(1, PAD_NEXT_OCTAVE, 0);
+        context.pad.send_cc(1, PAD_PREV_OCTAVE, 0);
         context.pad.send_cc(1, PAD_SESSION_CC, 0);
     }
 }
